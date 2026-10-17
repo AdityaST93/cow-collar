@@ -1,0 +1,14 @@
+{
+  "name": "cow-collar",
+  "version": "1.0.0",
+  "description": "Smart collar for cows and buffaloes: virtual fence plus behaviour monitoring. Simulator, live dashboard, backend and ESP32 firmware.",
+  "license": "MIT",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server/server.js",
+    "demo": "node tools/fake-collar.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "keywords": ["virtual-fence", "livestock", "gps", "lora", "esp32", "dairy"]
+}

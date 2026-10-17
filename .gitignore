@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+*.log
+
+# runtime data (saved fence etc.)
+data/*
+!data/.gitkeep
+
+# secrets: keep real Wi-Fi / API keys out of git
+firmware/**/config.local.h
+.env

@@ -1,0 +1,14 @@
+services:
+  cow-collar:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # Set a long random value before exposing this to the internet:  API_KEY=... docker compose up -d --build
+      API_KEY: ${API_KEY:-}
+    volumes:
+      - cow-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  cow-data:
