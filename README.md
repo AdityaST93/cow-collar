@@ -4,6 +4,12 @@ A smart collar for cows and buffaloes: a **virtual fence** (digital boundary) pl
 
 The repo contains a browser simulator, a live dashboard, a Node.js backend and reference ESP32 firmware. The backend and dashboard have **no npm dependencies**.
 
+## Live demo
+
+**Try it in your browser, nothing to install:** https://&lt;your-username&gt;.github.io/cow-collar/
+
+This is the offline simulator: animals graze, walk and rest inside a digital boundary, and you can watch warnings, fence crossings and restless alerts happen live. (Replace `<your-username>` with your GitHub username. The page goes live after you enable Pages, see "Publish the live demo" below.)
+
 > **Status:** the server, dashboard, simulator and shared logic are tested (21 automated tests). The ESP32 firmware is **reference code that has not been tested on real hardware, and has not been compile-verified in the Arduino IDE**. Bench-test it before putting it on an animal.
 
 ## How it works
@@ -45,6 +51,10 @@ Then open:
 | http://localhost:3000/simulator/ | Fully offline simulator (works without the server; you can also open the HTML file directly) |
 
 Run the tests with `npm test` (21 tests, nothing to install).
+
+### Publish the live demo
+
+The simulator is published to GitHub Pages by `.github/workflows/pages.yml`. One-time setup: on GitHub open **Settings → Pages** and set **Source** to **GitHub Actions**, then push to `main` (or run the "Live demo" workflow manually). The dashboard needs the Node server, so only the simulator is hosted on Pages.
 
 ### Secure the server
 
