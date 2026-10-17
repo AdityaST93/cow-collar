@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cow Collar: virtual fence aur behaviour monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef0e4;--ink:#1d2a1a;--mute:#5d6b54;--panel:#fbfbf5;--line:#cfd5bd;--field:#a9c274;--fence:#c2410c;--warn:rgba(234,179,8,.22);
+--graze:#3b7d3a;--walk:#c28a0e;--rest:#2f6fb0;--rum:#7a4fa8;--rest2:#c0392b;
+color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141a12;--ink:#e6ebd8;--mute:#9aa88e;--panel:#1c2419;--line:#34402f;--field:#3f5632;--fence:#fb923c;--warn:rgba(250,204,21,.18);--graze:#6fbf6d;--walk:#e4b13c;--rest:#6fa8e0;--rum:#b48be0;--rest2:#ff7b6b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141a12;--ink:#e6ebd8;--mute:#9aa88e;--panel:#1c2419;--line:#34402f;--field:#3f5632;--fence:#fb923c;--warn:rgba(250,204,21,.18);--graze:#6fbf6d;--walk:#e4b13c;--rest:#6fa8e0;--rum:#b48be0;--rest2:#ff7b6b;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Familjen Grotesk",system-ui,sans-serif;line-height:1.45}
+.wrap{max-width:1120px;margin:0 auto;padding:18px 16px 32px}
+header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:end;justify-content:space-between;margin-bottom:14px}
+h1{font-size:clamp(26px,5vw,40px);line-height:1.05;margin:0;font-weight:700;letter-spacing:-.02em}
+header p{margin:6px 0 0;color:var(--mute);max-width:52ch}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;font-weight:600;border:1.5px solid var(--ink);background:var(--panel);color:var(--ink);padding:8px 14px;border-radius:999px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--rest);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.live{display:inline-flex;align-items:center;gap:8px;font-weight:700}
+.dot{width:11px;height:11px;border-radius:50%;background:var(--mute)}
+.on .dot{background:#d62828;animation:p 1.2s infinite}
+@keyframes p{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.on .dot{animation:none}}
+.grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:14px}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+canvas{width:100%;height:auto;display:block;border-radius:10px;border:1px solid var(--line);touch-action:manipulation;cursor:pointer}
+.row{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:10px;color:var(--mute);font-size:14px}
+.row label{display:flex;gap:8px;align-items:center}
+h2{font-size:17px;margin:0 0 8px}
+.bar{display:grid;grid-template-columns:92px 1fr 40px;gap:8px;align-items:center;font-size:14px;margin:5px 0}
+.track{height:10px;border-radius:6px;background:var(--line);overflow:hidden}
+.fill{height:100%;width:0;transition:width .4s}
+.sel h3{margin:0;font-size:22px}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;color:#fff;font-weight:700;font-size:14px}
+.say{margin:10px 0;padding:10px 12px;border-left:4px solid var(--ink);background:var(--bg);border-radius:0 8px 8px 0}
+ul{list-style:none;margin:0;padding:0;font-size:14px}
+li{padding:6px 0;border-bottom:1px solid var(--line)}
+li b{font-variant-numeric:tabular-nums;margin-right:6px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.note{font-size:13px;color:var(--mute);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+ <div>
+  <h1>Cow Collar</h1>
+  <p>Digital boundary jo collar ki awaaz se kaam karti hai, aur har gaay-bhains ki harkat ka matlab.</p>
+ </div>
+ <div class="ctl">
+  <span class="live" id="live"><span class="dot"></span><span id="liveTxt">Paused</span></span>
+  <button id="bLive" aria-pressed="false">Live mode shuru karo</button>
+  <button id="bSnd" aria-pressed="false">Awaaz band</button>
+ </div>
+</header>
+
+<div class="grid">
+ <div class="card">
+  <canvas id="cv" width="800" height="560" aria-label="Pasture map jisme gaay-bhains aur digital boundary dikh rahi hai"></canvas>
+  <div class="row">
+   <label>Boundary ka size <input type="range" id="size" min="45" max="95" value="68"></label>
+   <label>Raftaar <input type="range" id="spd" min="1" max="8" value="2"></label>
+   <span>Kisi jaanwar par tap karo, uski details dikhengi.</span>
+  </div>
+ </div>
+
+ <div class="stack">
+  <div class="card sel" id="sel"></div>
+  <div class="card">
+   <h2>Poore jhund ka din</h2>
+   <div id="stats"></div>
+  </div>
+  <div class="card">
+   <h2>Collar ke events</h2>
+   <ul id="log"><li>Live mode shuru karo, events yahan aayenge.</li></ul>
+  </div>
+ </div>
+</div>
+<p class="note">Ye simulation hai. Asli collar mein GPS aur accelerometer ke data se yahi states nikalte hain (neeche chat mein hardware plan hai).</p>
+</div>
+
+<script>
+const W=800,H=560,cv=document.getElementById('cv'),g=cv.getContext('2d');
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const ST={
+ graze:{n:'Chara kha rahi hai',c:'--graze',say:'Sir neeche, dheere dheere aage badh rahi hai. Sab theek hai, pet bhar raha hai.'},
+ walk:{n:'Chal rahi hai',c:'--walk',say:'Ek jagah se doosri jagah ja rahi hai. Naya chara, paani ya jhund ke saath rehne ki koshish.'},
+ rest:{n:'Aaram kar rahi hai',c:'--rest',say:'Let kar rest. Din mein 10-12 ghante lete rehna aaraamdeh hone ki nishani hai.'},
+ rum:{n:'Jugaali kar rahi hai',c:'--rum',say:'Khaana dobara chaba rahi hai. Pachan theek hai, ye achhi sehat ka sign hai.'},
+ rl:{n:'Bechain hai',c:'--rest2',say:'Tez aur bar bar chal rahi hai. Garmi, tanav, bimari ya heat (garbh ke liye taiyaar) ho sakti hai. Paas ja kar dekho.'}
+};
+const keys=Object.keys(ST);
+const names=['Gauri','Kapila','Lakshmi','Shyama','Nandini','Kajri','Moti','Bhuri','Ganga'];
+let B={x:0,y:0,w:0,h:0},clock=0,running=false,sound=false,ac=null,lastBeep=0,sel=0,logs=[];
+function setB(){const f=document.getElementById('size').value/100;B.w=W*f;B.h=H*f;B.x=(W-B.w)/2;B.y=(H-B.h)/2}
+setB();
+const dE=(x,y)=>Math.min(x-B.x,B.x+B.w-x,y-B.y,B.y+B.h-y);
+const R=(a,b)=>a+Math.random()*(b-a);
+const inside=()=>({x:R(B.x+50,B.x+B.w-50),y:R(B.y+50,B.y+B.h-50)});
+const cows=names.map((n,i)=>({name:n,kind:i%3==2?'Bhains':'Gaay',...inside(),ang:R(0,6.28),state:'graze',t:R(3,8),tg:null,zone:0,warned:false,stub:Math.random()<.25,tm:{graze:1,walk:0,rest:0,rum:0,rl:0},warns:0,pulses:0,rlRun:0,alerted:false}));
+function pick(){const r=Math.random();return r<.38?'graze':r<.56?'walk':r<.7?'rest':r<.92?'rum':'rl'}
+function ev(txt){const m=Math.floor(clock/60),s=Math.floor(clock%60);logs.unshift(`<li><b>${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</b>${txt}</li>`);logs=logs.slice(0,8);document.getElementById('log').innerHTML=logs.join('')}
+function beep(f,type,d){if(!sound||!ac)return;const now=ac.currentTime;if(now-lastBeep<.12)return;lastBeep=now;const o=ac.createOscillator(),v=ac.createGain();o.type=type;o.frequency.value=f;v.gain.value=.06;o.connect(v);v.connect(ac.destination);o.start();o.stop(now+d)}
+function step(c,dt){
+ c.t-=dt;c.tm[c.state]+=dt;
+ if(c.t<=0){c.state=pick();c.t=R(4,12);c.tg=null;if(c.state=='walk'||c.state=='rl')c.tg=Math.random()<.2?{x:R(40,W-40),y:R(40,H-40)}:inside()}
+ const d=dE(c.x,c.y);let sp=0;
+ if(c.state=='graze'){sp=6;c.ang+=R(-.05,.05)}
+ if(c.state=='walk'||c.state=='rl'){sp=c.state=='rl'?75:38;if(!c.tg)c.tg=inside();
+  const dx=c.tg.x-c.x,dy=c.tg.y-c.y;c.ang=Math.atan2(dy,dx)+(c.state=='rl'?R(-.7,.7):0);
+  if(Math.hypot(dx,dy)<10)c.tg=Math.random()<.2?{x:R(40,W-40),y:R(40,H-40)}:inside()}
+ const ahead=dE(c.x+Math.cos(c.ang)*25,c.y+Math.sin(c.ang)*25),out=sp>0&&ahead<d;
+ if(d>40){c.zone=0;c.warned=false}
+ if(d<=0){if(c.zone!=2){c.zone=2;c.pulses++;ev(`${c.name} line paar kar gayi. Halka pulse mila, wapas ja rahi hai.`);beep(1300,'square',.35)}back(c)}
+ else if(d<40&&out&&c.zone==0){c.zone=1;c.warns++;beep(620,'sine',.25);
+  if(c.stub&&!c.warned){c.warned=true;ev(`${c.name} ne awaaz ignore ki, line ki taraf badh rahi hai.`)}
+  else{ev(`${c.name} boundary ke paas aayi. Warning sound baja, wo mud gayi.`);back(c)}}
+ if(c.state=='rl'){c.rlRun+=dt;if(c.rlRun>14&&!c.alerted){c.alerted=true;ev(`${c.name} kaafi der se bechain hai. Check karo.`)}}else{c.rlRun=0;c.alerted=false}
+ c.x+=Math.cos(c.ang)*sp*dt;c.y+=Math.sin(c.ang)*sp*dt;
+ c.x=Math.max(14,Math.min(W-14,c.x));c.y=Math.max(14,Math.min(H-14,c.y));
+}
+function back(c){c.tg=inside();if(c.state!='rl'){c.state='walk';c.t=R(5,8)}c.ang=Math.atan2(c.tg.y-c.y,c.tg.x-c.x)}
+function draw(){
+ g.fillStyle=css('--field');g.fillRect(0,0,W,H);
+ g.fillStyle=css('--warn');g.fillRect(B.x-40,B.y-40,B.w+80,B.h+80);
+ g.fillStyle=css('--field');g.fillRect(B.x+40,B.y+40,B.w-80,B.h-80);
+ g.setLineDash([12,8]);g.lineWidth=3;g.strokeStyle=css('--fence');g.strokeRect(B.x,B.y,B.w,B.h);g.setLineDash([]);
+ g.fillStyle=css('--fence');g.font='600 14px sans-serif';g.fillText('Digital boundary',B.x+8,B.y-8);
+ cows.forEach((c,i)=>{
+  g.save();g.translate(c.x,c.y);g.rotate(c.ang);
+  const buff=c.kind=='Bhains';
+  g.fillStyle=buff?'#3a3a3a':'#f4efe4';g.beginPath();g.ellipse(0,0,17,10,0,0,6.3);g.fill();
+  if(!buff){g.fillStyle='#4a3b2a';g.beginPath();g.ellipse(-4,-2,6,4,0,0,6.3);g.fill()}
+  g.fillStyle=buff?'#2a2a2a':'#e2d9c6';g.beginPath();g.arc(17,0,6,0,6.3);g.fill();
+  g.restore();
+  g.lineWidth=i==sel?4:2.5;g.strokeStyle=css(ST[c.state].c);g.beginPath();g.arc(c.x,c.y,i==sel?24:21,0,6.3);g.stroke();
+  if(c.zone){g.strokeStyle=css('--fence');g.lineWidth=2;g.beginPath();g.arc(c.x,c.y,29+(clock*20%8),0,6.3);g.stroke()}
+  if(i==sel){g.fillStyle=css('--ink');g.font='700 13px sans-serif';g.fillText(c.name,c.x-16,c.y-30)}
+ })
+}
+function ui(){
+ const c=cows[sel],tot=Object.values(c.tm).reduce((a,b)=>a+b,0)||1,s=ST[c.state];
+ document.getElementById('sel').innerHTML=`<h2>Chuni hui</h2><h3>${c.name} <small style="font-weight:400;color:var(--mute)">(${c.kind})</small></h3>
+ <p style="margin:6px 0"><span class="badge" style="background:${css(s.c)}">${s.n}</span></p>
+ <div class="say">${s.say}</div>
+ <div style="font-size:14px;color:var(--mute)">Warning: <b style="color:var(--ink)">${c.warns}</b> &nbsp; Pulse: <b style="color:var(--ink)">${c.pulses}</b> &nbsp; Collar: <b style="color:var(--ink)">${['Andar, safe','Boundary ke paas','Line ke paar'][c.zone]}</b></div>`;
+ const all={};keys.forEach(k=>all[k]=cows.reduce((a,x)=>a+x.tm[k],0));const T=Object.values(all).reduce((a,b)=>a+b,0)||1;
+ document.getElementById('stats').innerHTML=keys.map(k=>`<div class="bar"><span>${ST[k].n.split(' ')[0]}</span><div class="track"><div class="fill" style="width:${all[k]/T*100}%;background:${css(ST[k].c)}"></div></div><span>${Math.round(all[k]/T*100)}%</span></div>`).join('');
+}
+let last=performance.now(),acc=0;
+function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;
+ if(running){const sp=+document.getElementById('spd').value,d=dt*sp;clock+=d;cows.forEach(c=>step(c,d));acc+=dt;if(acc>.4){acc=0;ui()}}
+ draw();requestAnimationFrame(loop)}
+function setLive(on){running=on;const l=document.getElementById('live');l.classList.toggle('on',on);document.getElementById('liveTxt').textContent=on?'Live':'Paused';
+ const b=document.getElementById('bLive');b.setAttribute('aria-pressed',on);b.textContent=on?'Live mode roko':'Live mode shuru karo';ui()}
+document.getElementById('bLive').onclick=()=>setLive(!running);
+document.getElementById('bSnd').onclick=e=>{sound=!sound;if(sound&&!ac)ac=new(window.AudioContext||window.webkitAudioContext)();e.target.setAttribute('aria-pressed',sound);e.target.textContent=sound?'Awaaz chalu':'Awaaz band'};
+document.getElementById('size').oninput=setB;
+cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
+ let bi=sel,bd=40;cows.forEach((c,i)=>{const d=Math.hypot(c.x-x,c.y-y);if(d<bd){bd=d;bi=i}});sel=bi;ui()});
+ui();requestAnimationFrame(loop);setLive(true);
+</script>
+</body>
+</html>
